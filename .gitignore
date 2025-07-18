@@ -40,6 +40,9 @@ models/*.pth
 models/*.pkl
 models/*.bin
 
+# Trained models directory (excluded from version control)
+trained_models/
+
 # IDE
 .idea/
 .vscode/

@@ -112,10 +112,11 @@ def render_prediction_page():
                             texts = predict_df[text_col].tolist()
 
                             # Make predictions
-                            predicted_labels, _ = classifier.predict(texts)
+                            predicted_labels, probabilities = classifier.predict(texts)
 
                             # Add predictions column
                             predict_df['predicted_class'] = predicted_labels
+                            predict_df['probabilities'] = probabilities
 
                             # Display results
                             success_text("Batch prediction completed!")

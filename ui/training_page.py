@@ -23,9 +23,7 @@ def render_training_page():
         df = data_loader.load_csv_from_upload(uploaded_file)
 
         if df is not None:
-            # Preprocess data
-            df = data_loader.preprocess_data(df, "label")  # Default label column
-
+             # Default label column
             st.write("Dataset Preview:")
             st.write(df.head())
 
@@ -35,9 +33,17 @@ def render_training_page():
             # Select columns for text and label
             col1, col2 = st.columns(2)
             with col1:
-                text_column = st.selectbox("Select text column", column_names)
-            with col2:
                 label_column = st.selectbox("Select label column", column_names)
+            with col2:
+                text_column = st.selectbox("Select text column", column_names)
+                
+
+            # Ensure columns are selected (they should be by default)
+            text_column = text_column or column_names[0]
+            label_column = label_column or column_names[0]
+
+            # Preprocess data
+            df = data_loader.preprocess_data(df, label_column) 
 
             # Show count by label
             col_table, col_chart = st.columns(2)
@@ -138,39 +144,55 @@ def render_training_page():
                         # Store in session state
                         st.session_state.classifier = classifier
                         st.session_state.trained = True
+                        # Store training results in session state for persistence
+                        st.session_state.training_results = {
+                            'report': report,
+                            'cm': cm,
+                            'class_names': class_names,
+                            'label_column': label_column,
+                            'df': df
+                        }
 
                         # Display results
                         success_text("Training completed!")
 
-                        # Show classification report
-                        sub_header("Classification Report")
-                        report_df = format_classification_report(report)
-                        st.write(report_df)
-
-                        # Plot confusion matrix
-                        sub_header("Confusion Matrix")
-                        cm_image = plot_confusion_matrix(cm, class_names)
-                        st.markdown(f'<img src="data:image/png;base64,{cm_image}" width="600">', unsafe_allow_html=True)
-
-                        # Class distribution
-                        sub_header("Class Distribution")
-                        class_counts = df[label_column].value_counts()
-                        st.bar_chart(class_counts)
-
-                        # Save model section
-                        sub_header("Save Trained Model")
-                        model_name_input = st.text_input("Enter a name for your model:", "bert_classifier")
-                        if st.button("Save Model"):
-                            try:
-                                model_path, components_path = classifier.save(model_name_input)
-                                success_text(f"Model saved successfully as '{model_name_input}'!")
-                            except Exception as e:
-                                logger.error(f"Error saving model: {str(e)}")
-                                st.error(f"Error saving model: {str(e)}")
-
                     except Exception as e:
                         logger.error(f"Error during training: {str(e)}")
                         st.error(f"An error occurred during training: {str(e)}")
+
+            # Display training results if they exist in session state
+            if st.session_state.get('training_results'):
+                results = st.session_state.training_results
+                
+                # Show classification report
+                sub_header("Classification Report")
+                report_df = format_classification_report(results['report'])
+                st.write(report_df)
+
+                # Plot confusion matrix
+                sub_header("Confusion Matrix")
+                cm_image = plot_confusion_matrix(results['cm'], results['class_names'])
+                st.markdown(f'<img src="data:image/png;base64,{cm_image}" width="600">', unsafe_allow_html=True)
+
+                # Class distribution
+                sub_header("Class Distribution")
+                class_counts = results['df'][results['label_column']].value_counts()
+                st.bar_chart(class_counts)
+
+            # Save model section - moved outside training block for persistence
+            if st.session_state.get('trained', False) and st.session_state.get('classifier'):
+                sub_header("Save Trained Model")
+                model_name_input = st.text_input("Enter a name for your model:", "bert_classifier")
+                if st.button("Save Model"):
+                    try:
+                        classifier = st.session_state.classifier
+                        model_path, components_path = classifier.save(model_name_input)
+                        success_text(f"Model saved successfully as '{model_name_input}'!")
+                        logger.info(f"Model saved successfully: {model_path}, {components_path}")
+                    except Exception as e:
+                        logger.error(f"Error saving model: {str(e)}")
+                        st.error(f"Error saving model: {str(e)}")
+
         else:
             st.error("Failed to load the uploaded file. Please check if it's a valid CSV.")
     else:
